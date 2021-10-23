@@ -127,6 +127,9 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	int32 DashCounter = 2;
 
+	UPROPERTY(BlueprintReadOnly)//Checks if is dashing forward for the sprint attack
+	bool bIsDashingForward = false;
+
 	UFUNCTION()
 	void ParryBroken(FVector Location);
 
@@ -234,6 +237,8 @@ private:
 	void DrinkHealthPotion();
 	UFUNCTION()
 	void CheckChargedAttack();
+	UFUNCTION()
+	void StopDashingForward();
 
 
 
@@ -349,6 +354,7 @@ private:
 	bool Left = false;
 	UPROPERTY()
 	bool bCanDash = true;
+
 	
 	//to handle glowing orb cooldown
 	UPROPERTY()
@@ -361,6 +367,7 @@ private:
 	FTimerHandle TimerHandleForGroundFriction;
 	FTimerHandle TimerHandleForResetCastLogic;
 	FTimerHandle TimerHandleToCheckChargedAttack;
+	FTimerHandle TimerHandleForDashingForward;
 
 	//SOUNDS
 

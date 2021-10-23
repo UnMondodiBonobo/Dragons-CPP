@@ -5,6 +5,7 @@
 #include "Wizard.h"
 #include "Uruk.h"
 #include "UrukShield.h"
+#include "Ghost.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -176,6 +177,20 @@ void ASword::OnOverlapBegin(UPrimitiveComponent* OverlappedComp,  AActor* OtherA
 			}
 			else
 			{
+
+				APawn* OwnerPawn = Cast<APawn>(GetOwner());
+				if(OwnerPawn == nullptr) {return;}
+						
+				AController* PlayerController = OwnerPawn->GetController();
+				if(PlayerController == nullptr) {return;}
+						
+				FVector Location;
+				FRotator Rotation;
+				PlayerController->GetPlayerViewPoint(Location, Rotation);
+				FVector HitDirection = -Rotation.Vector();
+				FPointDamageEvent DamageEvent;//FDamageEvent con costruttore vuoto, da cambiare
+				UrukHit->TakeDamage(LightAttackDamage, DamageEvent, PlayerController, this);
+				
 				UE_LOG(LogTemp, Warning, TEXT("HAI COLPITO LO SCUDO"));
 				Reject();
 				bCheckAttack = false;

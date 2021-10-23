@@ -228,7 +228,7 @@ float AWizard::TakeDamage(float DamageAmount,struct FDamageEvent const & DamageE
 
 		Health -= Damage;
 
-		if(Health == 0) 
+		if(Health <= 0) 
 		{
 			bDead = true;
 			AMyGameModeBase* GameMode = GetWorld()->GetAuthGameMode<AMyGameModeBase>();
@@ -346,29 +346,37 @@ void AWizard::Interact()
 	bool isHit = GetWorld()->LineTraceSingleByChannel(HitResult, StartRay, EndRay, ECollisionChannel::ECC_Visibility, QueryParams);
 	if(isHit) 
 	{
-		if(HitResult.GetActor()->ActorHasTag(TEXT("InteractiblePotion"))) 
+		if(bIsDialogueSpawned && GhostKing && HitResult.GetActor()->ActorHasTag(TEXT("InteractibleDialogueKing"))) 
 		{
-			UE_LOG(LogTemp, Warning, TEXT("You Interacted"));
-			DrawDebugLine(GetWorld(), StartRay, EndRay, FColor::Green, false, 3.f);
-			HealthPotion = Cast<AHealthPotion>(HitResult.GetActor());
-			DrinkHealthPotion();
+			GhostKing->AddTextCounter();
 		}
+		else 
+		{
+			if(HitResult.GetActor()->ActorHasTag(TEXT("InteractiblePotion"))) 
+			{
+				UE_LOG(LogTemp, Warning, TEXT("You Interacted"));
+				DrawDebugLine(GetWorld(), StartRay, EndRay, FColor::Green, false, 3.f);
+				HealthPotion = Cast<AHealthPotion>(HitResult.GetActor());
+				DrinkHealthPotion();
+			}
 
-		else if(HitResult.GetActor()->ActorHasTag(TEXT("InteractibleDialogueKing"))) 
-		{
-			UE_LOG(LogTemp, Warning, TEXT("You Interacted"));
-			GhostKing = Cast<AGhostKing>(HitResult.GetActor());
-			if(!GhostKing) {return;}
-			GhostKing->SpawnGhostDialogue();
-			bIsDialogueSpawned = true;
+			else if(HitResult.GetActor()->ActorHasTag(TEXT("InteractibleDialogueKing"))) 
+			{
+				UE_LOG(LogTemp, Warning, TEXT("You Interacted"));
+				GhostKing = Cast<AGhostKing>(HitResult.GetActor());
+				if(!GhostKing) {return;}
+				GhostKing->SpawnGhostDialogue();
+				bIsDialogueSpawned = true;
 
+			}
+			else if(HitResult.GetActor()->ActorHasTag(TEXT("InteractibleBook"))) 
+			{
+				bIsBookMoving = true;
+				UE_LOG(LogTemp, Warning, TEXT("You Interacted"));
+				BookDelegate.Broadcast(bIsBookMoving);
+			}
 		}
-		else if(HitResult.GetActor()->ActorHasTag(TEXT("InteractibleBook"))) 
-		{
-			bIsBookMoving = true;
-			UE_LOG(LogTemp, Warning, TEXT("You Interacted"));
-			BookDelegate.Broadcast(bIsBookMoving);
-		}
+		
 		
 
 	}
@@ -485,8 +493,11 @@ void AWizard::Dash()
 		MovementComp->GroundFriction = 1.f;
 		DashCounter -= 1;
 		GetWorldTimerManager().SetTimer(TimerHandleForGroundFriction, this, &AWizard::ResetGroundFriction, GroundFrictionResetTime, false);
-		if(Forward) {ACharacter::LaunchCharacter
-				(FVector(GetActorForwardVector().X, GetActorForwardVector().Y, 0).GetSafeNormal(0.5f) * DashLength, true, true);}
+		if(Forward) {
+						ACharacter::LaunchCharacter(FVector(GetActorForwardVector().X, GetActorForwardVector().Y, 0).GetSafeNormal(0.5f) * DashLength, true, true);
+						bIsDashingForward = true;
+						GetWorldTimerManager().SetTimer(TimerHandleForDashingForward, this, &AWizard::StopDashingForward, 2.f, false);
+					}
 		if(!Forward) {ACharacter::LaunchCharacter
 				(FVector(GetActorForwardVector().X, GetActorForwardVector().Y, 0).GetSafeNormal(0.5f) * (-DashLength), true, true);}
 		if(Right) {ACharacter::LaunchCharacter
@@ -505,6 +516,12 @@ void AWizard::Dash()
 			}
 		}
 	}
+}
+
+void AWizard::StopDashingForward() 
+{
+	bIsDashingForward = false;
+	GetWorldTimerManager().ClearTimer(TimerHandleForDashingForward);
 }
 	
 
@@ -562,6 +579,7 @@ void AWizard::CheckChargedAttack() //Starts charged attack
 	GetWorldTimerManager().ClearTimer(TimerHandleToCheckChargedAttack);
 }
 
+
 void AWizard::ReleaseAttack() //Starts light Attack if is not charging(starts on release)
 {
 	bIsCharging = false;
@@ -575,6 +593,8 @@ void AWizard::ReleaseAttack() //Starts light Attack if is not charging(starts on
 		return;
 	}
 
+	
+
 	if(bHasTelekinesisGrabbed) 
 	{
 		ResetCast();
@@ -584,7 +604,16 @@ void AWizard::ReleaseAttack() //Starts light Attack if is not charging(starts on
 		TelekinesisHit->FindComponentByClass<UPrimitiveComponent>()->AddImpulse(ImpulseVector);
 	}
 	
-	if(!bIsChargingWithOrb && !bIsChargedWithOrb && !bIsCharged && !bIsCharging && !bIsAttackingAnimation && !bIsAttackingNow && !bIsCasting && !bIsTelekinesisLogicStillWorking && !bIsRejected && !bIsStunned && !bIsBeenHit && !MovementComp->IsFalling() && !bIsSprinting)
+	if(bIsDashingForward && !bIsChargingWithOrb && !bIsChargedWithOrb && !bIsCharged && !bIsCharging && !bIsAttackingAnimation && !bIsAttackingNow && !bIsCasting && !bIsTelekinesisLogicStillWorking && !bIsRejected && !bIsStunned && !bIsBeenHit && !bIsSprinting) 
+	{
+		bIsAttackingNow = true;
+		bIsAttackingAnimation = true;
+		UGameplayStatics::PlayWorldCameraShake(GetWorld(), CameraShake, GetActorLocation(), 0.f, 1000.f, 1.f, false);
+		Sword->Attack();
+		UE_LOG(LogTemp, Warning, TEXT("YOU ATTACKED, SWORD IS CHECKING"));
+	}
+	
+	else if(!bIsChargingWithOrb && !bIsChargedWithOrb && !bIsCharged && !bIsCharging && !bIsAttackingAnimation && !bIsAttackingNow && !bIsCasting && !bIsTelekinesisLogicStillWorking && !bIsRejected && !bIsStunned && !bIsBeenHit && !MovementComp->IsFalling() && !bIsSprinting)
 	{
 	
 		bIsAttackingNow = true;
